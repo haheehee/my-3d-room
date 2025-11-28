@@ -1,7 +1,7 @@
 # my-3d-room
 # 🏡 3D Vibe Room Simulator
 
-[![GitHub Pages 배포 상태](https://img.shields.io/github/deployments/haheeyang/my-3d-room/github-pages?label=GitHub%20Pages&logo=github)](https://haheeyang.github.io/my-3d-room/)
+[![GitHub Pages 배포 상태](https://img.shields.io/github/deployments/haheehee/my-3d-room/github-pages?label=GitHub%20Pages&logo=github)](https://haheehee.github.io/my-3d-room/)
 
 **3D Vibe Room Simulator**는 웹 브라우저 기반의 간단한 3차원 공간 설계 도구입니다. 복잡한 설치 없이 바로 방의 크기를 설정하고, 가구, 문/창문을 배치하여 나만의 공간 레이아웃을 빠르게 시각화할 수 있습니다.
 
@@ -59,8 +59,8 @@
 
 | 구분 | 주소 |
 | :--- | :--- |
-| **라이브 데모** | **[여기를 클릭하여 시뮬레이터 실행]**(https://haheeyang.github.io/my-3d-room/) |
-| **GitHub 리포지토리** | [https://github.com/haheeyang/my-3d-room/](https://github.com/haheeyang/my-3d-room/) |
+| **라이브 데모** | **[여기를 클릭하여 시뮬레이터 실행]**(https://haheehee.github.io/my-3d-room/) |
+| **GitHub 리포지토리** | [https://github.com/haheehee/my-3d-room/](https://github.com/haheehee/my-3d-room/) |
 
 
 ---
@@ -72,7 +72,7 @@ MIT License
 # my-3d-room
 # 🏡 3D Vibe Room Simulator
 
-[![GitHub Pages Deployment Status](https://img.shields.io/github/deployments/haheeyang/my-3d-room/github-pages?label=GitHub%20Pages&logo=github)](https://haheeyang.github.io/my-3d-room/)
+[![GitHub Pages Deployment Status](https://img.shields.io/github/deployments/haheehee/my-3d-room/github-pages?label=GitHub%20Pages&logo=github)](https://haheehee.github.io/my-3d-room/)
 
 **3D Vibe Room Simulator** is a simple web browser-based 3D space design tool. Without complicated installation, you can quickly visualize your own space layout by setting room dimensions and placing furniture, doors, and windows.
 
@@ -130,8 +130,8 @@ This project is implemented using only client-side technologies without the need
 
 | Category | Address |
 | :--- | :--- |
-| **Live Demo** | **[Click here to run the simulator]**(https://haheeyang.github.io/my-3d-room/) |
-| **GitHub Repository** | [https://github.com/haheeyang/my-3d-room/](https://github.com/haheeyang/my-3d-room/) |
+| **Live Demo** | **[Click here to run the simulator]**(https://haheehee.github.io/my-3d-room/) |
+| **GitHub Repository** | [https://github.com/haheehee/my-3d-room/](https://github.com/haheehee/my-3d-room/) |
 
 ---
 
