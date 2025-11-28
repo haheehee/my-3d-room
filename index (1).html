@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Vibe Room Simulator (Expandable Panels)</title>
+    <style>
+        :root {
+            /* --- 다크 모드 기본 설정 (Sidebar/HTML) --- */
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --accent-color: #8c52ff;
+            --text-color: #ffffff;
+            --border-color: #333;
+            --grid-color: rgba(255, 255, 255, 0.1);
+            /* 패널 기본 너비 */
+            --panel-width: 300px;
+            --panel-collapsed-width: 40px;
+        }
+        
+        body.light-mode {
+            /* --- 라이트 모드 오버라이드 (Sidebar/HTML) --- */
+            --bg-color: #f0f2f5;
+            --panel-color: #ffffff;
+            --accent-color: #6c5ce7;
+            --text-color: #333333;
+            --border-color: #e0e0e0;
+            --grid-color: rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0;
+            height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Pretendard', sans-serif;
+            display: flex;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* 좌/우 컨트롤 패널 공통 */
+        .sidebar, .right-panel {
+            width: var(--panel-width);
+            background-color: var(--panel-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+            transition: width 0.3s ease, background-color 0.3s, padding 0.3s;
+            overflow-y: auto; 
+            overflow-x: hidden;
+            flex-shrink: 0; 
+            position: relative; /* 토글 버튼 기준점 */
+        }
+
+        .sidebar {
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+        }
+
+        .right-panel {
+            box-shadow: -4px 0 15px rgba(0,0,0,0.5);
+        }
+
+        /* 패널 축소 상태 */
+        .sidebar.collapsed {
+            width: var(--panel-collapsed-width);
+            padding: 20px 5px;
+        }
+
+        .right-panel.collapsed {
+            width: var(--panel-collapsed-width);
+            padding: 20px 5px;
+        }
+
+        /* 축소 상태 시 콘텐츠 숨김 */
+        .collapsed > *:not(.toggle-btn) {
+            display: none;
+        }
+
+        /* 메인 콘텐츠 영역 (Canvas) */
+        .main-area {
+            flex: 1;
+            position: relative;
+            display: flex; /* 캔버스 컨테이너 역할 */
+            overflow: hidden;
+        }
+        
+        #mainArea canvas {
+            display: block;
+            width: 100% !important; 
+            height: 100% !important;
+        }
+
+        /* Panel 내부 스타일 (기존 유지) */
+        h1 { margin: 0; font-size: 20px; color: var(--accent-color); }
+        h2 { margin: 0 0 10px 0; font-size: 14px; color: #888; text-transform: uppercase; }
+
+        .control-group {
+            background: color-mix(in srgb, var(--panel-color), #000000 10%);
+            padding: 15px;
+            border-radius: 12px;
+            transition: background 0.3s;
+        }
+        body.light-mode .control-group {
+             background: color-mix(in srgb, var(--panel-color), #000000 5%);
+        }
+
+        .input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        label { font-size: 13px; color: var(--text-color); opacity: 0.8; }
+        
+        input[type="number"], select {
+            background: color-mix(in srgb, var(--panel-color), #000000 15%);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px;
+            border-radius: 4px;
+            width: 100px; 
+            text-align: right;
+            transition: background 0.3s, border-color 0.3s;
+        }
+        
+        select { text-align: left; width: 100%; }
+        input[type="number"] { width: 60px; }
+
+
+        input[type="color"] {
+            background: none;
+            border: none;
+            width: 100%;
+            height: 40px;
+            cursor: pointer;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 5px;
+        }
+
+        button:hover { filter: brightness(1.1); }
+        button.outline { 
+            background: transparent; 
+            border: 2px solid var(--border-color); 
+            color: var(--text-color); 
+        }
+        button.outline:hover { border-color: var(--accent-color); color: var(--accent-color); }
+        
+        .save-load-group button {
+            width: 49%;
+            margin: 0;
+            display: inline-block;
+        }
+        .save-load-group {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        /* 패널 축소/확장 버튼 */
+        .toggle-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 40px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            z-index: 20; 
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            padding: 0;
+            border-radius: 0;
+        }
+        
+        /* 좌측 패널 토글 버튼 */
+        #toggleLeft {
+            right: 0; 
+            border-top-left-radius: 4px; 
+            border-bottom-left-radius: 4px;
+        }
+        
+        /* 우측 패널 토글 버튼 */
+        #toggleRight {
+            left: 0; 
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+        }
+
+        /* --- MODAL 스타일 --- */
+        #modal-container {
+            display: none; 
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background-color: var(--panel-color);
+            margin: 15% auto; 
+            padding: 30px;
+            border-radius: 12px;
+            width: 350px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            transition: all 0.3s;
+        }
+
+        .modal-content h3 {
+            color: var(--accent-color);
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .modal-content .input-row {
+            margin-bottom: 15px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            width: 48%;
+            margin: 0;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <button class="toggle-btn" id="toggleLeft" onclick="togglePanel('sidebar')">
+            &lt;
+        </button>
+        <h1>🛋️ 3D VIBE ROOM</h1>
+        
+        <div class="control-group">
+            <h2>방 크기 설정 (단위: M)</h2>
+            <div class="input-row">
+                <label>가로 (W)</label>
+                <input type="number" id="roomW" value="5">
+            </div>
+            <div class="input-row">
+                <label>세로 (H)</label>
+                <input type="number" id="roomH" value="3">
+            </div>
+            <div class="input-row">
+                <label>깊이 (D)</label>
+                <input type="number" id="roomD" value="6">
+            </div>
+            <button class="outline" onclick="addRoom()">🏠 새 방 만들기</button>
+        </div>
+
+        <div class="control-group">
+            <h2>가구 추가 (단위: M)</h2>
+            <div class="input-row">
+                <label>배치할 방 선택</label>
+                <select id="furnitureRoomSelect"></select>
+            </div>
+            <hr style="border-color: var(--border-color); margin: 10px 0;">
+            <div class="input-row">
+                <label>가로 (W)</label>
+                <input type="number" id="furnW" value="1.8">
+            </div>
+            <div class="input-row">
+                <label>세로 (H)</label> 
+                <input type="number" id="furnH" value="0.5">
+            </div>
+            <div class="input-row">
+                <label>깊이 (D)</label>
+                <input type="number" id="furnD" value="2.2">
+            </div>
+            <div class="input-row" style="flex-direction: column; align-items: flex-start;">
+                <label style="margin-bottom:5px;">색상 (Color)</label>
+                <input type="color" id="furnColor" value="#ff7675">
+            </div>
+            <button onclick="addFurniture()">가구 배치하기 (+)</button>
+        </div>
+
+        <div class="control-group">
+            <h2>🚪 문/창문 배치</h2>
+            <div class="input-row">
+                <label>배치할 방 선택</label>
+                <select id="doorRoomSelect"></select>
+            </div>
+            <hr style="border-color: var(--border-color); margin: 10px 0;">
+            <div class="input-row">
+                <label>문 너비 (W)</label>
+                <input type="number" id="doorW" value="0.9">
+            </div>
+            <div class="input-row">
+                <label>벽면 선택</label>
+                <select id="doorWall">
+                    <option value="+Z">정면 (+Z)</option>
+                    <option value="-Z">후면 (-Z)</option>
+                    <option value="+X">우측면 (+X)</option>
+                    <option value="-X">좌측면 (-X)</option>
+                </select>
+            </div>
+            <div class="input-row">
+                <label>경첩/스윙 설정</label>
+                <select id="doorHinge">
+                    <option value="L_IN">왼쪽 경첩, 안으로 열림</option>
+                    <option value="R_IN">오른쪽 경첩, 안으로 열림</option>
+                    <option value="L_OUT">왼쪽 경첩, 밖으로 열림</option>
+                    <option value="R_OUT">오른쪽 경첩, 밖으로 열림</option>
+                </select>
+            </div>
+            <div class="input-row">
+                <label>벽면 위치 (Offset)</label>
+                <input type="number" id="doorOffset" value="0">
+            </div>
+            <button onclick="addDoor()">🚪 문 배치하기 (+)</button>
+        </div>
+    </div>
+
+    <div class="main-area" id="mainArea"></div>
+    
+    <div class="right-panel" id="right-panel">
+        <button class="toggle-btn" id="toggleRight" onclick="togglePanel('right-panel')">
+            &gt;
+        </button>
+
+        <div class="control-group">
+            <h2>저장 및 기타 기능</h2>
+            <div class="save-load-group">
+                <button class="outline" onclick="loadScene()">📂 불러오기</button>
+                <button onclick="saveScene()">💾 현재 상태 저장</button>
+            </div>
+            <button class="outline" onclick="resetScene()" style="margin-top: 10px;">🔄 모든 레이아웃 초기화</button>
+            <button id="modeToggle" onclick="toggleMode()" class="outline">☀️ Light Mode</button>
+            <button onclick="captureScene()">🖼️ 3D 캡쳐하기</button>
+        </div>
+
+        <div class="control-group" style="margin-top: auto;">
+             <h2>조작 TIP</h2>
+            <div style="font-size: 11px; color: var(--text-color); opacity: 0.8; line-height: 1.5;">
+                <p style="margin: 0 0 5px 0;">
+                    **더블클릭**: 객체 속성 수정
+                </p>
+                <p style="margin: 0 0 5px 0;">
+                    **Alt + Shift + 드래그**: **방** 위치 이동
+                </p>
+                <p style="margin: 0 0 5px 0;">
+                    **Shift + 드래그**: **가구/문** 수평 이동
+                </p>
+                <p style="margin: 0;">
+                    **Ctrl + 드래그**: 가구 수직 이동
+                </p>
+            </div>
+        </div>
+        
+    </div>
+
+    <div id="modal-container">
+        <div class="modal-content">
+            <h3 id="modal-title">객체 속성 수정</h3>
+            <div id="modal-body">
+                </div>
+            <div class="modal-buttons">
+                <button class="outline" onclick="document.getElementById('modal-container').style.display='none'">취소</button>
+                <button onclick="applyModification()">적용</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // --- 전역 변수 설정 ---
+        const mainArea = document.getElementById('mainArea');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, (window.innerWidth - 600) / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); 
+        
+        renderer.setSize(mainArea.clientWidth, window.innerHeight); 
+        mainArea.appendChild(renderer.domElement);
+        
+        let roomCounter = 0; 
+        const rooms = []; 
+
+        let selectedObjectForModal = null; // 모달에서 수정할 객체를 저장하는 전역 변수
+
+        // --- 패널 상태 관리 ---
+        let isSidebarCollapsed = false;
+        let isRightPanelCollapsed = false;
+
+        function updateRendererSize() {
+             setTimeout(() => {
+                const sidebarWidth = isSidebarCollapsed ? 40 : 300;
+                const rightPanelWidth = isRightPanelCollapsed ? 40 : 300;
+                const newWidth = window.innerWidth - sidebarWidth - rightPanelWidth;
+                const newHeight = window.innerHeight;
+
+                if (newWidth > 0 && newHeight > 0) {
+                    renderer.setSize(newWidth, newHeight);
+                    camera.aspect = newWidth / newHeight;
+                    camera.updateProjectionMatrix();
+                }
+             }, 300); 
+        }
+        
+        function togglePanel(panelId) {
+            const panel = document.getElementById(panelId);
+            const toggleButton = document.getElementById('toggle' + (panelId === 'sidebar' ? 'Left' : 'Right'));
+
+            if (panelId === 'sidebar') {
+                isSidebarCollapsed = !isSidebarCollapsed;
+                panel.classList.toggle('collapsed', isSidebarCollapsed);
+                toggleButton.innerHTML = isSidebarCollapsed ? '&gt;' : '&lt;';
+            } else if (panelId === 'right-panel') {
+                isRightPanelCollapsed = !isRightPanelCollapsed;
+                panel.classList.toggle('collapsed', isRightPanelCollapsed);
+                toggleButton.innerHTML = isRightPanelCollapsed ? '&lt;' : '&gt;';
+            }
+            
+            updateRendererSize();
+        }
+
+        window.addEventListener('resize', updateRendererSize);
+        
+        // --- 3D 상호작용을 위한 변수 ---
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        
+        let draggableObjects = []; 
+        let selectedObject = null; 
+        let dragMode = null; 
+        let isRoomDrag = false; 
+        
+        let dragYFixedPosition = 0; 
+        
+        const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.001); 
+        const offset = new THREE.Vector3();
+        
+        // 1. 조명 및 OrbitControls 설정 
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 10, 5);
+        scene.add(directionalLight);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 3; 
+
+        scene.background = new THREE.Color(0x111111);
+
+        // --- 유틸리티 함수 ---
+
+        function updateRoomSelect() {
+            const selectFurn = document.getElementById('furnitureRoomSelect');
+            const selectDoor = document.getElementById('doorRoomSelect');
+            
+            [selectFurn, selectDoor].forEach(select => select.innerHTML = '');
+
+            if (rooms.length === 0) {
+                const option = document.createElement('option');
+                option.text = '방을 먼저 만드세요';
+                option.disabled = true;
+                option.selected = true;
+                selectFurn.appendChild(option);
+                selectDoor.appendChild(option.cloneNode(true));
+                return;
+            }
+
+            // Room 1, Room 2 순서로 재정렬
+            rooms.sort((a, b) => {
+                const matchA = a.userData.name.match(/\d+/);
+                const matchB = b.userData.name.match(/\d+/);
+                const numA = matchA ? parseInt(matchA[0]) : Infinity;
+                const numB = matchB ? parseInt(matchB[0]) : Infinity;
+                return numA - numB;
+            });
+            roomCounter = rooms.length; // 카운터 재설정
+
+            rooms.forEach(room => {
+                const option = document.createElement('option');
+                option.value = room.uuid;
+                option.text = room.userData.name;
+                selectFurn.appendChild(option.cloneNode(true));
+                selectDoor.appendChild(option);
+            });
+        }
+        
+        function getRoomByUUID(uuid) {
+            return rooms.find(room => room.uuid === uuid);
+        }
+
+        function toggleMode() {
+            const body = document.body;
+            const isLight = body.classList.toggle('light-mode');
+            const button = document.getElementById('modeToggle');
+            
+            const lightWallHex = 0xf0f0f0; 
+            const darkWallHex = 0x444444; 
+            const lightSceneHex = 0xdddddd; 
+            const darkSceneHex = 0x111111;  
+
+            scene.traverse(obj => {
+                if (obj.isMesh && obj.userData.isRoom) {
+                    obj.material.color.setHex(isLight ? lightWallHex : darkWallHex);
+                }
+            });
+            scene.background = new THREE.Color(isLight ? lightSceneHex : darkSceneHex);
+
+            if (isLight) {
+                button.textContent = '🌙 Dark Mode';
+                button.classList.remove('outline');
+            } else {
+                button.textContent = '☀️ Light Mode';
+                button.classList.add('outline');
+            }
+        }
+
+        // 3. 새 방 만들기 (저장/불러오기에서 재사용을 위해 함수화)
+        function createRoomMesh(w, h, d, name, position) {
+             const roomGeometry = new THREE.BoxGeometry(w, h, d);
+            const initialWallHex = document.body.classList.contains('light-mode') ? 0xf0f0f0 : 0x444444;
+
+            const wallMaterial = new THREE.MeshPhongMaterial({ 
+                color: initialWallHex, 
+                side: THREE.BackSide 
+            });
+            
+            const newRoomMesh = new THREE.Mesh(roomGeometry, wallMaterial);
+            newRoomMesh.position.y = h / 2;
+            
+            if (position) {
+                 newRoomMesh.position.set(position.x, h/2, position.z);
+            }
+
+            newRoomMesh.userData = {
+                isRoom: true, 
+                name: name,
+                width: w,
+                height: h,
+                depth: d
+            };
+
+            return newRoomMesh;
+        }
+
+        function addRoom() {
+            const w = parseFloat(document.getElementById('roomW').value);
+            const h = parseFloat(document.getElementById('roomH').value);
+            const d = parseFloat(document.getElementById('roomD').value);
+
+            if (w < 1 || h < 1 || d < 1) {
+                alert("방 크기는 최소 1m 이상이어야 합니다.");
+                return;
+            }
+
+            roomCounter++;
+            const roomName = `Room ${roomCounter}`;
+            const newRoomMesh = createRoomMesh(w, h, d, roomName);
+
+            // 다음 방이 기존 방과 겹치지 않도록 임시 오프셋 적용 (Z축으로 이동)
+            if (rooms.length > 0) {
+                 const lastRoom = rooms[rooms.length - 1];
+                 const offsetZ = lastRoom.position.z + lastRoom.userData.depth / 2 + d / 2 + 0.5;
+                 newRoomMesh.position.z = offsetZ;
+            }
+
+
+            scene.add(newRoomMesh);
+            rooms.push(newRoomMesh);
+            draggableObjects.push(newRoomMesh); 
+
+            if (rooms.length === 1) {
+                camera.position.set(w * 0.8, h * 0.5, d * 1.5);
+                controls.target.set(newRoomMesh.position.x, h/2, newRoomMesh.position.z); 
+                controls.update(); 
+            }
+
+            updateRoomSelect();
+            alert(`${roomName}이 생성되었습니다. Alt + Shift를 눌러 이동할 수 있습니다.`);
+        }
+
+
+        // 4. 가구 추가 (저장/불러오기에서 재사용을 위해 함수화)
+        function createFurnitureMesh(w, h, d, color, parentUUID, position) {
+            const furnGeometry = new THREE.BoxGeometry(w, h, d);
+            const furnMaterial = new THREE.MeshPhongMaterial({ color: color });
+            const furniture = new THREE.Mesh(furnGeometry, furnMaterial);
+
+            if (position) {
+                furniture.position.set(position.x, position.y, position.z);
+            } else {
+                 const targetRoom = getRoomByUUID(parentUUID);
+                 if (targetRoom) {
+                    furniture.position.x = targetRoom.position.x;
+                    furniture.position.y = h / 2;
+                    furniture.position.z = targetRoom.position.z; 
+                 }
+            }
+            
+            furniture.userData = {
+                isDraggable: true,
+                isDoor: false,
+                baseHeight: h / 2, 
+                parentRoomUUID: parentUUID,
+                width: w, depth: d, height: h,
+                color: color
+            };
+
+            return furniture;
+        }
+
+        function addFurniture() {
+            const roomUUID = document.getElementById('furnitureRoomSelect').value;
+            const targetRoom = getRoomByUUID(roomUUID);
+
+            if (!targetRoom) {
+                alert("가구를 배치할 방을 선택하거나, 먼저 방을 만드세요.");
+                return;
+            }
+
+            const w = parseFloat(document.getElementById('furnW').value);
+            const h = parseFloat(document.getElementById('furnH').value);
+            const d = parseFloat(document.getElementById('furnD').value);
+            const color = document.getElementById('furnColor').value;
+
+            if (w > targetRoom.userData.width || d > targetRoom.userData.depth || h > targetRoom.userData.height) {
+                alert(`가구 크기가 선택된 방(${targetRoom.userData.name}) 크기를 초과합니다!`);
+                return;
+            }
+
+            const furniture = createFurnitureMesh(w, h, d, color, roomUUID);
+            
+            scene.add(furniture);
+            draggableObjects.push(furniture);
+        }
+
+        // 5. 문 추가
+        function addDoor() {
+            const roomUUID = document.getElementById('doorRoomSelect').value;
+            const wall = document.getElementById('doorWall').value;
+            const hingeType = document.getElementById('doorHinge').value; 
+            const offset = parseFloat(document.getElementById('doorOffset').value);
+            const w = parseFloat(document.getElementById('doorW').value);
+
+            if (isNaN(w) || w < 0.5 || w > 2.5) {
+                alert("문의 너비는 0.5m ~ 2.5m 사이여야 합니다.");
+                return;
+            }
+            if (!roomUUID) {
+                alert("문을 배치할 방을 선택하거나, 먼저 방을 만드세요.");
+                return;
+            }
+            
+            const doorGroup = createDoorGroup(w, wall, hingeType, offset, roomUUID);
+            if(doorGroup) {
+                scene.add(doorGroup);
+                // doorSlab은 doorGroup의 첫 번째 자식
+                draggableObjects.push(doorGroup.children[0]);
+            }
+        }
+
+
+        // 문 그룹 생성 (저장/불러오기에서 재사용을 위해 함수화)
+        function createDoorGroup(w, wall, hingeType, offset, roomUUID, position) {
+             const targetRoom = getRoomByUUID(roomUUID);
+
+             if (!targetRoom) {
+                 console.error("문 그룹 생성에 필요한 방 정보가 유실되었습니다.");
+                 return null;
+             }
+             
+             const h = 2.1; 
+             const t = 0.05; 
+             const doorGroup = new THREE.Group();
+            
+            // 1. Door Slab 
+            const doorGeometry = new THREE.BoxGeometry(w, h, t);
+            const doorMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8 });
+            const doorSlab = new THREE.Mesh(doorGeometry, doorMaterial);
+            doorGroup.add(doorSlab);
+
+            // 2. Swing Visualization 
+            const swingRadius = w * 0.95; 
+            const arcShape = new THREE.Shape();
+            const arcGeometry = new THREE.ShapeGeometry(arcShape);
+            const arcMaterial = new THREE.MeshBasicMaterial({ color: 0x88ff88, transparent: true, opacity: 0.1, side: THREE.DoubleSide });
+            const arcMesh = new THREE.Mesh(arcGeometry, arcMaterial);
+            arcMesh.rotation.x = Math.PI / 2; 
+            arcMesh.position.y = 0.001; 
+            doorGroup.add(arcMesh);
+            
+            // 3. Hinge and Rotation Setup (재계산)
+            let slabOffsetX = w / 2; 
+            let rotation = 0; 
+            
+            if (hingeType.startsWith('R')) { slabOffsetX = -w / 2; }
+            doorSlab.position.x = slabOffsetX;
+            doorSlab.position.y = h / 2;
+
+            let arcStart = 0, arcEnd = 0, arcCenter = new THREE.Vector3();
+
+            // 4. Wall Placement and Group Rotation
+            const roomW = targetRoom.userData.width;
+            const roomD = targetRoom.userData.depth;
+            const roomCenter = targetRoom.position;
+
+            if (position) {
+                // 불러오기 시 저장된 위치 사용
+                doorGroup.position.set(position.x, position.y, position.z);
+            } else {
+                // 새로 배치 시 계산
+                switch (wall) {
+                    case '+Z': doorGroup.position.x = offset + roomCenter.x; doorGroup.position.z = roomCenter.z + roomD / 2 - t / 2; rotation = 0; break;
+                    case '-Z': doorGroup.position.x = offset + roomCenter.x; doorGroup.position.z = roomCenter.z - roomD / 2 + t / 2; rotation = Math.PI; break;
+                    case '+X': doorGroup.position.x = roomCenter.x + roomW / 2 - t / 2; doorGroup.position.z = offset + roomCenter.z; rotation = Math.PI / 2; break;
+                    case '-X': doorGroup.position.x = roomCenter.x - roomW / 2 + t / 2; doorGroup.position.z = offset + roomCenter.z; rotation = -Math.PI / 2; break;
+                }
+            }
+
+            // 스윙 방향 설정
+            switch (wall) {
+                case '+Z': 
+                    if (hingeType === 'L_IN') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI; arcEnd = Math.PI / 2; }
+                    if (hingeType === 'R_IN') { arcCenter.set(w / 2, 0, 0); arcStart = 0; arcEnd = Math.PI / 2; }
+                    if (hingeType === 'L_OUT') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI * 2; arcEnd = Math.PI * 3 / 2; }
+                    if (hingeType === 'R_OUT') { arcCenter.set(w / 2, 0, 0); arcStart = Math.PI * 3 / 2; arcEnd = Math.PI * 2; }
+                    break;
+                case '-Z': 
+                     if (hingeType === 'L_IN') { arcCenter.set(-w / 2, 0, 0); arcStart = 0; arcEnd = Math.PI / 2; }
+                    if (hingeType === 'R_IN') { arcCenter.set(w / 2, 0, 0); arcStart = Math.PI; arcEnd = Math.PI * 3 / 2; }
+                    if (hingeType === 'L_OUT') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI * 3 / 2; arcEnd = Math.PI * 2; }
+                    if (hingeType === 'R_OUT') { arcCenter.set(w / 2, 0, 0); arcStart = Math.PI / 2; arcEnd = Math.PI; }
+                    break;
+                case '+X': 
+                     if (hingeType === 'L_IN') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI / 2; arcEnd = Math.PI; }
+                    if (hingeType === 'R_IN') { arcCenter.set(w / 2, 0, 0); arcStart = 0; arcEnd = Math.PI * 3 / 2; } 
+                    if (hingeType === 'L_OUT') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI * 3 / 2; arcEnd = Math.PI * 2; }
+                    if (hingeType === 'R_OUT') { arcCenter.set(w / 2, 0, 0); arcStart = Math.PI; arcEnd = Math.PI * 3 / 2; }
+                    break;
+                case '-X': 
+                    if (hingeType === 'L_IN') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI * 3 / 2; arcEnd = Math.PI * 2; }
+                    if (hingeType === 'R_IN') { arcCenter.set(w / 2, 0, 0); arcStart = Math.PI / 2; arcEnd = Math.PI; }
+                    if (hingeType === 'L_OUT') { arcCenter.set(-w / 2, 0, 0); arcStart = Math.PI; arcEnd = Math.PI / 2; }
+                    if (hingeType === 'R_OUT') { arcCenter.set(w / 2, 0, 0); arcStart = Math.PI * 2; arcEnd = Math.PI * 3 / 2; }
+                    break;
+            }
+
+            // 스윙 아크 업데이트
+            arcMesh.geometry.dispose();
+            const arcShapeUpdated = new THREE.Shape();
+            arcShapeUpdated.absarc(arcCenter.x, arcCenter.y, swingRadius, arcStart, arcEnd, hingeType.endsWith('_OUT')); 
+
+            arcMesh.geometry = new THREE.ShapeGeometry(arcShapeUpdated);
+            arcMesh.rotation.x = Math.PI / 2; 
+            arcMesh.position.y = 0.001; 
+            
+            doorGroup.rotation.y = rotation;
+            
+            // 문짝 메시 (DoorSlab)에 속성 저장
+            doorSlab.userData = {
+                isDraggable: true,
+                isDoor: true,
+                baseWall: wall,
+                doorW: w,
+                doorT: t,
+                doorH: h,
+                parentRoomUUID: roomUUID,
+                hingeType: hingeType,
+                roomW: roomW, roomD: roomD 
+            };
+            
+            return doorGroup;
+        }
+
+        // 6. 모든 레이아웃 초기화
+        function resetScene() {
+            const objectsToRemove = scene.children.filter(obj => 
+                (obj.isMesh && obj.userData.isRoom) || (obj.isMesh && obj.userData.isDraggable && !obj.userData.isDoor) || obj.isGroup
+            );
+
+            objectsToRemove.forEach(obj => {
+                scene.remove(obj);
+                obj.traverse(child => {
+                    if (child.isMesh) {
+                        if(child.geometry) child.geometry.dispose();
+                        if(child.material) child.material.dispose();
+                    }
+                });
+            });
+
+            draggableObjects = [];
+            rooms.length = 0;
+            roomCounter = 0;
+            
+            // 카메라 초기화
+            camera.position.set(5, 5, 10);
+            controls.target.set(0, 0, 0);
+            controls.update();
+
+            document.getElementById('roomW').value = 5;
+            document.getElementById('roomH').value = 3;
+            document.getElementById('roomD').value = 6;
+            
+            updateRoomSelect();
+            alert("모든 레이아웃이 초기화되었습니다. 새로운 방을 설계해 보세요!");
+        }
+        
+        // --- 캡쳐/저장/불러오기 기능 (로직 변경 없음) ---
+        function captureScene() {
+            try {
+                renderer.render(scene, camera);
+                const imageURL = renderer.domElement.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = imageURL;
+                link.download = '3d_room_vibe_' + new Date().getTime() + '.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                alert("현재 3D 장면이 'png' 파일로 다운로드되었습니다.");
+            } catch (e) {
+                alert("캡쳐에 실패했습니다: " + e.message);
+            }
+        }
+        
+        function saveScene() {
+            const layoutData = {
+                rooms: [],
+                furniture: [],
+                doors: []
+            };
+
+            rooms.forEach(room => {
+                layoutData.rooms.push({
+                    uuid: room.uuid, name: room.userData.name, width: room.userData.width, height: room.userData.height, depth: room.userData.depth,
+                    position: { x: room.position.x, y: room.position.y, z: room.position.z }
+                });
+            });
+
+            draggableObjects.forEach(obj => {
+                const data = obj.userData.isDoor ? obj.userData : obj.userData;
+                if (data.isDoor) {
+                    const doorGroup = obj.parent;
+                    layoutData.doors.push({ ...data, position: { x: doorGroup.position.x, y: doorGroup.position.y, z: doorGroup.position.z } });
+                } else if (data.isDraggable && !data.isRoom) {
+                    layoutData.furniture.push({ ...data, position: { x: obj.position.x, y: obj.position.y, z: obj.position.z } });
+                }
+            });
+
+            const dataStr = JSON.stringify(layoutData, null, 2);
+            const blob = new Blob([dataStr], { type: 'text/plain' });
+            
+            const a = document.createElement('a');
+            a.download = '3d_room_layout_' + new Date().getTime() + '.txt';
+            a.href = URL.createObjectURL(blob);
+            a.click();
+            URL.revokeObjectURL(a.href);
+            
+            alert("레이아웃 정보가 텍스트 파일로 저장되었습니다.");
+        }
+
+        function loadScene() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt';
+
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        resetScene(); 
+                        const uuidMap = new Map();
+
+                        data.rooms.forEach(roomData => {
+                            const newRoomMesh = createRoomMesh(roomData.width, roomData.height, roomData.depth, roomData.name, roomData.position);
+                            uuidMap.set(roomData.uuid, newRoomMesh.uuid);
+                            scene.add(newRoomMesh); rooms.push(newRoomMesh); draggableObjects.push(newRoomMesh);
+                        });
+
+                        data.furniture.forEach(furnData => {
+                            const newParentUUID = uuidMap.get(furnData.parentRoomUUID);
+                            if (!newParentUUID) return;
+                            const furniture = createFurnitureMesh(furnData.width, furnData.height, furnData.depth, furnData.color, newParentUUID, furnData.position);
+                            scene.add(furniture); draggableObjects.push(furniture);
+                        });
+
+                        data.doors.forEach(doorData => {
+                             const newParentUUID = uuidMap.get(doorData.parentRoomUUID);
+                             if (!newParentUUID) return;
+                             const doorGroup = createDoorGroup(doorData.doorW, doorData.baseWall, doorData.hingeType, null, newParentUUID, doorData.position);
+                             if (doorGroup) {
+                                scene.add(doorGroup); draggableObjects.push(doorGroup.children[0]);
+                             }
+                        });
+
+                        updateRoomSelect();
+                        updateRendererSize();
+                        alert("레이아웃이 성공적으로 불러와졌습니다.");
+
+                    } catch (error) {
+                        alert("파일을 읽는 중 오류가 발생했습니다. \n" + error.message);
+                        console.error("Load Error:", error);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // --- 객체 속성 수정 함수 (모달 사용) ---
+        function generateInputHtml(label, id, value, type = 'number', step = 0.1, min = 0.1) {
+            let inputHtml;
+            if (type === 'color') {
+                inputHtml = `<input type="color" id="${id}" value="${value}" style="width: 100px; height: 30px; padding: 0;">`;
+            } else if (type === 'select') {
+                const options = value.options.map(opt => 
+                    `<option value="${opt.value}" ${opt.value === value.current ? 'selected' : ''}>${opt.label}</option>`
+                ).join('');
+                inputHtml = `<select id="${id}">${options}</select>`;
+            } else {
+                inputHtml = `<input type="${type}" id="${id}" value="${value.toFixed(2)}" step="${step}" min="${min}">`;
+            }
+
+            return `
+                <div class="input-row">
+                    <label>${label}</label>
+                    ${inputHtml}
+                </div>
+            `;
+        }
+
+        function modifyObject(object) {
+            selectedObjectForModal = object;
+            const modalBody = document.getElementById('modal-body');
+            const modalTitle = document.getElementById('modal-title');
+            let data = object.userData.isDoor ? object.children[0].userData : object.userData;
+            let htmlContent = '';
+
+            if (data.isRoom) {
+                // **방 (Room) 속성 수정**
+                modalTitle.textContent = `🏠 방 속성 수정: ${data.name}`;
+                htmlContent += generateInputHtml('가로 (W) m', 'modalW', data.width);
+                htmlContent += generateInputHtml('세로 (H) m', 'modalH', data.height);
+                htmlContent += generateInputHtml('깊이 (D) m', 'modalD', data.depth);
+            } else if (data.isDoor) {
+                // **문 (Door) 속성 수정**
+                modalTitle.textContent = `🚪 문 속성 수정`;
+                htmlContent += generateInputHtml('문 너비 (W) m', 'modalW', data.doorW, 'number', 0.1, 0.5);
+                htmlContent += generateInputHtml('경첩/스윙 설정', 'modalHinge', {
+                    current: data.hingeType,
+                    options: [
+                        { value: 'L_IN', label: '왼쪽 경첩, 안으로 열림' },
+                        { value: 'R_IN', label: '오른쪽 경첩, 안으로 열림' },
+                        { value: 'L_OUT', label: '왼쪽 경첩, 밖으로 열림' },
+                        { value: 'R_OUT', label: '오른쪽 경첩, 밖으로 열림' },
+                    ]
+                }, 'select');
+            } else if (data.isDraggable) {
+                // **가구 (Furniture) 속성 수정**
+                modalTitle.textContent = `🛋️ 가구 속성 수정`;
+                htmlContent += generateInputHtml('가로 (W) m', 'modalW', data.width);
+                htmlContent += generateInputHtml('세로 (H) m', 'modalH', data.height);
+                htmlContent += generateInputHtml('깊이 (D) m', 'modalD', data.depth);
+                htmlContent += generateInputHtml('색상 (Color)', 'modalColor', data.color, 'color');
+            }
+
+            modalBody.innerHTML = htmlContent;
+            document.getElementById('modal-container').style.display = 'block';
+        }
+
+        function applyModification() {
+            if (!selectedObjectForModal) return;
+
+            const object = selectedObjectForModal;
+            document.getElementById('modal-container').style.display = 'none';
+
+            let data = object.userData.isDoor ? object.children[0].userData : object.userData;
+
+            if (data.isRoom) {
+                // 방 수정 적용
+                const newW = parseFloat(document.getElementById('modalW').value);
+                const newH = parseFloat(document.getElementById('modalH').value);
+                const newD = parseFloat(document.getElementById('modalD').value);
+
+                if (isNaN(newW) || isNaN(newH) || isNaN(newD) || newW < 1 || newH < 1 || newD < 1) {
+                    alert("유효한 크기를 입력해야 합니다 (최소 1m).");
+                    return;
+                }
+                
+                const oldPos = object.position.clone();
+                const oldUUID = object.uuid; 
+                
+                scene.remove(object);
+                object.geometry.dispose(); object.material.dispose();
+                
+                const newMesh = createRoomMesh(newW, newH, newD, data.name, {x: oldPos.x, y: oldPos.y, z: oldPos.z});
+                newMesh.userData.width = newW; newMesh.userData.height = newH; newMesh.userData.depth = newD;
+
+                const roomIndex = rooms.findIndex(r => r.uuid === oldUUID);
+                if (roomIndex !== -1) rooms[roomIndex] = newMesh; 
+                
+                draggableObjects = draggableObjects.filter(o => o !== object);
+                draggableObjects.push(newMesh);
+                scene.add(newMesh);
+                updateRoomSelect(); 
+                
+            } else if (data.isDoor) {
+                // 문 수정 적용
+                const newW = parseFloat(document.getElementById('modalW').value);
+                const newHingeType = document.getElementById('modalHinge').value;
+
+                if (isNaN(newW) || newW < 0.5 || newW > 2.5) {
+                    alert("유효한 너비(0.5m ~ 2.5m)를 입력해야 합니다.");
+                    return;
+                }
+                
+                const doorGroup = object.parent;
+                const room = getRoomByUUID(data.parentRoomUUID);
+
+                if (!room) return; 
+                
+                const currentOffsetPosition = doorGroup.position.clone();
+                
+                scene.remove(doorGroup);
+                draggableObjects = draggableObjects.filter(o => o !== object);
+                doorGroup.traverse(child => { if (child.isMesh) { if(child.geometry) child.geometry.dispose(); if(child.material) child.material.dispose(); } });
+
+                const newDoorGroup = createDoorGroup(newW, data.baseWall, newHingeType, null, room.uuid, currentOffsetPosition);
+                 if (newDoorGroup) {
+                    scene.add(newDoorGroup);
+                    draggableObjects.push(newDoorGroup.children[0]);
+                 }
+                
+            } else if (data.isDraggable) {
+                // 가구 수정 적용
+                const newW = parseFloat(document.getElementById('modalW').value);
+                const newH = parseFloat(document.getElementById('modalH').value);
+                const newD = parseFloat(document.getElementById('modalD').value);
+                const newColor = document.getElementById('modalColor').value;
+
+                if (isNaN(newW) || isNaN(newH) || isNaN(newD) || newW < 0.1 || newH < 0.1 || newD < 0.1) {
+                    alert("유효한 크기를 입력해야 합니다.");
+                    return;
+                }
+                
+                object.geometry.dispose(); object.material.dispose();
+                object.geometry = new THREE.BoxGeometry(newW, newH, newD);
+                object.material = new THREE.MeshPhongMaterial({ color: newColor || data.color });
+                
+                object.position.y = newH / 2;
+                object.userData = { 
+                    ...data, 
+                    width: newW, height: newH, depth: newD,
+                    baseHeight: newH / 2, color: newColor || data.color
+                };
+            }
+            selectedObjectForModal = null;
+        }
+        
+        // --- 마우스 이벤트 및 드래그 로직 (로직 변경 없음) ---
+        function getNormalizedPointer(event) {
+             const rect = renderer.domElement.getBoundingClientRect();
+             const x = event.clientX - rect.left;
+             const y = event.clientY - rect.top;
+
+             const newPointer = new THREE.Vector2();
+             newPointer.x = (x / rect.width) * 2 - 1; 
+             newPointer.y = - (y / rect.height) * 2 + 1;
+             return newPointer;
+        }
+
+        function onPointerDown(event) {
+            if (event.target.closest('#modal-container') || event.target.classList.contains('toggle-btn')) return;
+
+            isRoomDrag = event.altKey && event.shiftKey;
+
+            if (!event.shiftKey && !event.ctrlKey && !isRoomDrag) return;
+
+            pointer.copy(getNormalizedPointer(event));
+
+            raycaster.setFromCamera(pointer, camera);
+            
+            let targets = isRoomDrag ? rooms : draggableObjects;
+            const intersects = raycaster.intersectObjects(targets);
+
+            if (intersects.length > 0) {
+                controls.enabled = false;
+                
+                let mesh = intersects[0].object;
+                
+                if (isRoomDrag) {
+                    selectedObject = mesh;
+                } else if (mesh.userData.isDoor) {
+                    selectedObject = mesh.parent;
+                } else {
+                    selectedObject = mesh;
+                }
+
+                
+                let itemData = selectedObject.userData.isDoor ? selectedObject.children[0].userData : selectedObject.userData;
+
+
+                if (event.ctrlKey) {
+                    dragMode = 'vertical';
+                } else if (event.shiftKey) {
+                    dragMode = 'horizontal';
+                    
+                    if (isRoomDrag || !itemData.isDoor) {
+                       dragYFixedPosition = selectedObject.position.y;
+                    }
+
+                    if (raycaster.ray.intersectPlane(dragPlane, offset)) {
+                        offset.sub(selectedObject.position); 
+                    }
+                }
+            }
+        }
+
+        function onPointerDrag(event) {
+            if (selectedObject) {
+                pointer.copy(getNormalizedPointer(event));
+
+                let itemData = selectedObject.userData.isDoor ? selectedObject.children[0].userData : selectedObject.userData;
+                let targetRoom = null;
+                
+                if (!isRoomDrag && itemData.parentRoomUUID) {
+                    targetRoom = getRoomByUUID(itemData.parentRoomUUID);
+                }
+
+
+                if (dragMode === 'horizontal') {
+                    raycaster.setFromCamera(pointer, camera);
+                    let intersection = new THREE.Vector3();
+
+                    if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+                        let newPos = intersection.sub(offset);
+                        
+                        if (isRoomDrag) {
+                            selectedObject.position.x = newPos.x;
+                            selectedObject.position.z = newPos.z;
+                            selectedObject.position.y = itemData.height / 2;
+                        
+                        } else if (itemData.isDoor) {
+                            if (!targetRoom) return; 
+                            
+                            const wall = itemData.baseWall;
+                            const roomCenter = targetRoom.position;
+                            const roomW = targetRoom.userData.width;
+                            const roomD = targetRoom.userData.depth;
+
+                            const doorW = itemData.doorW;
+                            const doorT = itemData.doorT;
+                            
+                            selectedObject.position.y = itemData.doorH / 2;
+                            
+                            if (wall === '+Z') { 
+                                selectedObject.position.z = roomCenter.z + roomD / 2 - doorT / 2;
+                                selectedObject.position.x = newPos.x; 
+                            } else if (wall === '-Z') {
+                                selectedObject.position.z = roomCenter.z - roomD / 2 + doorT / 2;
+                                selectedObject.position.x = newPos.x; 
+                            } else if (wall === '+X') {
+                                selectedObject.position.x = roomCenter.x + roomW / 2 - doorT / 2;
+                                selectedObject.position.z = newPos.z; 
+                            } else if (wall === '-X') {
+                                selectedObject.position.x = roomCenter.x - roomW / 2 + doorT / 2;
+                                selectedObject.position.z = newPos.z; 
+                            }
+                            
+                            if (wall === '+Z' || wall === '-Z') { 
+                                const limit = roomCenter.x + roomW / 2 - doorW / 2;
+                                const minLimit = roomCenter.x - roomW / 2 + doorW / 2;
+                                selectedObject.position.x = Math.max(minLimit, Math.min(limit, selectedObject.position.x));
+                            } else { 
+                                const limit = roomCenter.z + roomD / 2 - doorW / 2;
+                                const minLimit = roomCenter.z - roomD / 2 + doorW / 2;
+                                selectedObject.position.z = Math.max(minLimit, Math.min(limit, selectedObject.position.z));
+                            }
+
+                        } else {
+                            if (!targetRoom) return;
+                            
+                            selectedObject.position.copy(newPos);
+                            selectedObject.position.y = dragYFixedPosition; 
+
+                            const halfW = itemData.width / 2;
+                            const halfD = itemData.depth / 2;
+                            
+                            const roomCenter = targetRoom.position;
+                            const roomW = targetRoom.userData.width;
+                            const roomD = targetRoom.userData.depth;
+
+                            const maxX = roomCenter.x + roomW / 2 - halfW;
+                            const minX = roomCenter.x - roomW / 2 + halfW;
+                            const maxZ = roomCenter.z + roomD / 2 - halfD;
+                            const minZ = roomCenter.z - roomD / 2 + halfD;
+
+                            selectedObject.position.x = Math.max(minX, Math.min(maxX, selectedObject.position.x));
+                            selectedObject.position.z = Math.max(minZ, Math.min(maxZ, selectedObject.position.z));
+                        }
+                    }
+                } else if (dragMode === 'vertical') {
+                    if (itemData.isDoor || isRoomDrag) return; 
+
+                    const sensitivity = 0.01;
+                    const movementY = event.movementY * -1;
+                    
+                    selectedObject.position.y += movementY * sensitivity;
+
+                    let roomH = targetRoom ? targetRoom.userData.height : 3; 
+                    selectedObject.position.y = Math.max(itemData.baseHeight, Math.min(roomH, selectedObject.position.y));
+                }
+            }
+        }
+
+        function onPointerUp() {
+            if (selectedObject) {
+                controls.enabled = true;
+                selectedObject = null;
+                dragMode = null;
+                dragYFixedPosition = 0; 
+                isRoomDrag = false;
+            }
+        }
+        
+        function onPointerMove(event) {
+             pointer.copy(getNormalizedPointer(event));
+        }
+
+        function onDoubleClick(event) {
+            if (event.target.closest('#modal-container') || event.target.classList.contains('toggle-btn')) return;
+
+             pointer.copy(getNormalizedPointer(event));
+
+             raycaster.setFromCamera(pointer, camera);
+             
+             const targets = [...rooms, ...draggableObjects]; 
+             const intersects = raycaster.intersectObjects(targets);
+
+             if (intersects.length > 0) {
+                 let mesh = intersects[0].object;
+                 let targetObject = mesh.userData.isDoor ? mesh.parent : mesh; 
+                 
+                 modifyObject(targetObject);
+             }
+        }
+
+        // 이벤트 리스너 등록
+        renderer.domElement.addEventListener('pointermove', onPointerMove);
+        renderer.domElement.addEventListener('pointerdown', onPointerDown);
+        renderer.domElement.addEventListener('pointerup', onPointerUp);
+        renderer.domElement.addEventListener('dblclick', onDoubleClick); 
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); 
+            renderer.render(scene, camera);
+        }
+
+        updateRoomSelect(); 
+        updateRendererSize(); 
+        animate();
+    </script>
+</body>
+</html>
